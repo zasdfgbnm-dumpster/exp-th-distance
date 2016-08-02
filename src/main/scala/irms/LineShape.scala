@@ -21,7 +21,9 @@ package irms {
         // thirvec(xi) = sum( j from 0 to m, f1(freqj,maxj)(param1j)(xi) )
         def thirvec(gparams:Array[Float], params:Array[Float]):Array[Float] = {
             // split params into [param1]
-            val param1s = params.sliding(nparams1,nparams1).toArray
+            val param1s = if(nparams1==0) {
+                thirpeaks.map(j=>Array[Float]())
+            } else params.sliding(nparams1,nparams1).toArray
             // apply (freq,max) to f1
             val fs = thirpeaks.map(j => f1(j._1,j._2) _)
             // apply (gparams,params1) to f1(freq,max)
@@ -72,23 +74,23 @@ package irms {
 
     }
 
-    private class ForcedOscillatior(expir:Array[Float], thirpeaks:Array[(Float,Float)]) extends LineShape(expir,thirpeaks) {
-        override val nparams1:Int = 1
-
-        // formula A = F / sqrt( (f0^2-f^2)^2 + 4*beta^2*f^2 )
-        //         E = A^2
-        def f1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):Float = {
-            val beta = params1(0)
-            val b2f24 = 4 * beta*beta * freq*freq
-            val FF = max * b2f24
-            val diff2freq = freq*freq - x*x
-            FF / ( diff2freq*diff2freq + b2f24 )
-        }
-
-        // formula dE/d(beta) = ...
-        def derivative1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):(Array[Float],Array[Float]) = {
-            //TODO: implement
-            (gparams,gparams)
-        }
-    }
+    // private class ForcedOscillatior(expir:Array[Float], thirpeaks:Array[(Float,Float)]) extends LineShape(expir,thirpeaks) {
+    //     override val nparams1:Int = 1
+    //
+    //     // formula A = F / sqrt( (f0^2-f^2)^2 + 4*beta^2*f^2 )
+    //     //         E = A^2
+    //     def f1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):Float = {
+    //         val beta = params1(0)
+    //         val b2f24 = 4 * beta*beta * freq*freq
+    //         val FF = max * b2f24
+    //         val diff2freq = freq*freq - x*x
+    //         FF / ( diff2freq*diff2freq + b2f24 )
+    //     }
+    //
+    //     // formula dE/d(beta) = ...
+    //     def derivative1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):(Array[Float],Array[Float]) = {
+    //         //TODO: implement
+    //         (gparams,gparams)
+    //     }
+    // }
 }
