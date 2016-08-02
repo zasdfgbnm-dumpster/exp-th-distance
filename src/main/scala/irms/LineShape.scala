@@ -77,22 +77,23 @@ package irms {
 
     }
 
-    // private class ForcedOscillatior(expir:Array[Float], thir:Array[(Float,Float)]) extends LineShape {
-    //     override val nparams1:Int = 1
-    //
-    //     // formula A = F / sqrt( (f0^2-f^2)^2 + 4*beta^2*f^2 )
-    //     //         E = A^2
-    //     def f1(freq:Float,max:Foat)(gparams:Array[Float], params1:Array[Float])(x:Float):Float = {
-    //         val beta = params1(0)
-    //         val b2f24 = 4 * beta*beta * freq*freq
-    //         val FF = max * b2f24
-    //         val diff2freq = freq*freq - x*x
-    //         FF / ( diff2freq*diff2freq + b2f24 )
-    //     }
-    //
-    //     // formula dE/d(beta) = ...
-    //     def derivative1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):Array[Float] = {
-    //         //TODO: implement
-    //     }
-    // }
+    private class ForcedOscillatior(expir:Array[Float], thirpeaks:Array[(Float,Float)]) extends LineShape(expir,thirpeaks) {
+        override val nparams1:Int = 1
+
+        // formula A = F / sqrt( (f0^2-f^2)^2 + 4*beta^2*f^2 )
+        //         E = A^2
+        def f1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):Float = {
+            val beta = params1(0)
+            val b2f24 = 4 * beta*beta * freq*freq
+            val FF = max * b2f24
+            val diff2freq = freq*freq - x*x
+            FF / ( diff2freq*diff2freq + b2f24 )
+        }
+
+        // formula dE/d(beta) = ...
+        def derivative1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):(Array[Float],Array[Float]) = {
+            //TODO: implement
+            (gparams,gparams)
+        }
+    }
 }
