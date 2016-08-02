@@ -10,12 +10,7 @@ package irms {
         def f1(freq:Float,max:Float)(gparams:Array[Float],params1:Array[Float])(x:Float):Float
         def derivative1(freq:Float,max:Float)(gparams:Array[Float],params1:Array[Float])(x:Float):(Array[Float],Array[Float])
 
-        // info of x
-        // TODO: import values of xmin,xmax,xstep from 03_create_mid_struct_table.scala
-        val xmin = 670 //included
-        val xmax = 3702 //included
-        val xstep = 4
-        val xs = Range(xmin,xmax+xstep,xstep).toArray
+        val xs = Range(X.xmin,X.xmax+X.xstep,X.xstep).toArray
 
         // Note: these functions are implemented assuming that the IR intensity and the
         //       TRANSMITTANCE have the same unit
