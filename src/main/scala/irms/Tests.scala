@@ -8,12 +8,13 @@ package irms {
         private class TestGaussian(thirpeaks:Array[(Float,Float)]) extends LineShape(Array[Float](),thirpeaks) {
             override val nparams1:Int = 0
             val s = 20
-
+            def baseline(gparams:Array[Float])(x:Float):Float = x * 0.01f
+            def derivativeb(gparams:Array[Float])(x:Float):Array[Float] = gparams
             def f1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):Float = {
                 val xx = (x-freq)/s
                 max * exp(-xx*xx).toFloat
             }
-            def derivative1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):(Array[Float],Array[Float]) = (gparams,gparams)
+            def derivativef1(freq:Float,max:Float)(gparams:Array[Float], params1:Array[Float])(x:Float):(Array[Float],Array[Float]) = (gparams,gparams)
         }
 
         def main(args: Array[String]):Unit = {
