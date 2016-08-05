@@ -9,13 +9,13 @@ package irms {
         import X.xs
         import LineShapeHelpers.vec
 
-        private class TestGaussian(peaks:Seq[(Float,Float)]) extends LineShape(peaks) {
+        private class TestGaussian(peaks:Seq[(Double,Double)]) extends LineShape(peaks) {
             override val nparams1:Int = 0
             val s = 20
-            def baseline(gparams:Seq[Float])(x:Float):Float = x * 0.01f
-            def f1(freq:Float,max:Float,gparams:Seq[Float], params1:Seq[Float])(x:Float):Float = {
+            def baseline(gparams:Seq[Double])(x:Double):Double = x * 0.01f
+            def f1(freq:Double,max:Double,gparams:Seq[Double], params1:Seq[Double])(x:Double):Double = {
                 val xx = (x-freq)/s
-                max * exp(-xx*xx).toFloat
+                max * exp(-xx*xx)
             }
         }
 
@@ -26,7 +26,7 @@ package irms {
 
             // draw thir
             val thir = session.read.parquet(path).as[TheoreticalIR]
-            val thirvec = thir.map(j=>vec(new TestGaussian(j.freqs).thir(Seq[Float](),Seq[Float]())).toArray)
+            val thirvec = thir.map(j=>vec(new TestGaussian(j.freqs).thir(Seq[Double](),Seq[Double]())).toArray)
             val thirstr = thirvec.map(a=>a.map(_.toString).reduce(_+" "+_))
             val thirstrs = thirstr.take(20).reduce(_+"\n"+_)
             println(thirstrs)
