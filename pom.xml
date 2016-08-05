@@ -15,9 +15,9 @@
             <version>2.11.8</version>
         </dependency>
         <dependency>
-            <groupId>com.github.bruneli.scalaopt</groupId>
-            <artifactId>scalaopt-core_2.10</artifactId>
-            <version>0.1</version>
+            <groupId>org.scalanlp</groupId>
+            <artifactId>breeze_2.11</artifactId>
+            <version>0.12</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
