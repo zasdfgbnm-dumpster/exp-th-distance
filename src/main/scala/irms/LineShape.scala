@@ -1,6 +1,6 @@
 package irms {
 
-    private object LineShapeHelpers {
+    object LineShapeHelpers {
         // vectorization
         // TODO: maybe it's better to set this as a class method of LineShape ?
         def vec[R](f:Float=>R):Seq[R] = X.xs.map(f)
@@ -108,7 +108,7 @@ package irms {
 
         // formula:
         // sum( i from 0 to n, ( thir(xi)-expir(xi) ) ^ 2 )
-        override def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
+        def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
             (vec(thir(gparams,params)),expir).zipped.map((a,b)=>(a-b)*(a-b)).reduce(_+_)
         }
 
