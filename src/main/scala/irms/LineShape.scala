@@ -1,20 +1,22 @@
 package irms {
 
-    object LineShapeHelpers {
+    private object LineShapeHelpers {
         import X.xs
 
-        // vectoriz
+        // vectorization
         def vec[R](f:Float=>R):Seq[R] = xs.map(f)
 
         // calculate elementwise plus/multiplies of two Seq/tuple2:
-        // only tuple2 and Seq of Float are supported now...
+        // only tuple2, Seq and Float are supported now...
         def cplus[C](a1:C,a2:C):C = ((a1,a2).asInstanceOf[(Any,Any)] match {
-            case (a1:Seq[Float],a2:Seq[Float]) => (a1,a2).zipped.map(_+_)
+            case (a1:Seq[Any],a2:Seq[Any]) => (a1,a2).zipped.map(cplus[Any])
             case (a1:(Any,Any),a2:(Any,Any)) => (cplus[Any](a1._1,a2._1),cplus[Any](a1._2,a2._2))
+            case (a1:Float,a2:Float) => a1+a2
         }).asInstanceOf[C]
         def cmult[C](collection:C,scalar:Float):C = (collection match {
-            case c:Seq[Float] => c.map(scalar*_)
+            case c:Seq[Any] => c.map(cmult[Any](_,scalar))
             case c:(Any,Any) => (cmult[Any](c._1,scalar),cmult[Any](c._2,scalar))
+            case c:Float => scalar*c
         }).asInstanceOf[C]
 
     }
