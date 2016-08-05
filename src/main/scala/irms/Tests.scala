@@ -1,12 +1,15 @@
 import org.apache.spark.sql._
 import org.apache.spark._
 import scala.math._
-import irms.X._
 
 package irms {
 
     object Tests {
-        private class TestGaussian(thirpeaks:Seq[(Float,Float)]) extends LineShape(Seq[Float](),thirpeaks) {
+
+        import X.xs
+        import LineShapeHelpers.vec
+
+        private class TestGaussian(peaks:Seq[(Float,Float)]) extends LineShape(Seq[Float](),peaks) {
             override val nparams1:Int = 0
             val s = 20
             def baseline(gparams:Seq[Float])(x:Float):Float = x * 0.01f
@@ -18,14 +21,14 @@ package irms {
             def df1(freq:Float,max:Float,gparams:Seq[Float], params1:Seq[Float])(x:Float):(Seq[Float],Seq[Float]) = (gparams,gparams)
         }
 
-        def main(args: Seq[String]):Unit = {
+        def main(args: Array[String]):Unit = {
             val session = SparkSession.builder.appName("draw_thir").getOrCreate()
             import session.implicits._
             val path = "/home/gaoxiang/irms/create-dataset-for-ir/outputs/06/thir"
 
             // draw thir
             val thir = session.read.parquet(path).as[TheoreticalIR]
-            val thirvec = thir.map(j=>xs.map(x=>new TestGaussian(j.freqs).thir(Seq[Float](),Seq[Float]())(x)).toArray)
+            val thirvec = thir.map(j=>vec(new TestGaussian(j.freqs).thir(Seq[Float](),Seq[Float]())).toArray)
             val thirstr = thirvec.map(a=>a.map(_.toString).reduce(_+" "+_))
             val thirstrs = thirstr.take(20).reduce(_+"\n"+_)
             println(thirstrs)
