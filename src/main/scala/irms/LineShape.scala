@@ -52,8 +52,12 @@ package irms {
     }
 
     trait LineShapeWithLoss extends LineShape {
-        // Loss function
-        def loss(gparams:Seq[Float], params:Seq[Float],expir:Seq[Float]):Float
+        // Loss functions
+        // The difference between loss1 and loss is, loss is the final loss value that
+        // will be used by users, while loss1 is a single frame loss which might be
+        // adjusted further by the class
+        def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float
+        def loss(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = loss1(expir)(gparams,params)
     }
 
     trait OptimizedLoss extends LineShapeWithLoss {
@@ -64,6 +68,10 @@ package irms {
         // df1: derivative of f1 with gparams and params1.
         // return_value._1 are derivative with gparams, return_value._2 are with params1
         def df1(freq:Float,max:Float,gparams:Seq[Float],params1:Seq[Float])(x:Float):(Seq[Float],Seq[Float])
+
+        // dloss1: derivative of loss1 w.r.t. gparams and params
+        // return_value._1 are derivative with gparams, return_value._2 are with params
+        def dloss1(expir:Seq[Float])(gparams:Seq[Float],params:Seq[Float]):(Seq[Float],Seq[Float])
 
         // derivative of theoretical spectrum vector with gparams and params
         // formula:
@@ -77,16 +85,21 @@ package irms {
             (dthir_dgparams,df1s_dparams1s.flatMap(a=>a))
         }
 
-        // the loss function of one frame during optimization
-        def loss1(gparams:Seq[Float], params:Seq[Float]):Float
-
         // the function that optimize parameters to minimize loss1
-        // the return value is optimized (gparams,params,loss1)
-        def optimize(func:(Seq[Float],Seq[Float])=>Float, gparams:Seq[Float], params:Seq[Float]):(Seq[Float],Seq[Float],Float)
+        // the return value is optimized (allparams,f)
+        def optimize(f:(Seq[Float])=>Float, df:(Seq[Float])=>Seq[Float], initial:Seq[Float]):(Seq[Float],Float)
 
         // the final loss function after optimization
-        def loss(gparams:Seq[Float], params:Seq[Float],expir:Seq[Float]):Float = {
-            optimize(loss1, gparams, params)._3
+        override def loss(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
+            // adapt loss1 and dloss1 to optimize
+            val split = gparams.length
+            val allparams = gparams++params
+            def loss1opt(allparams:Seq[Float]) = (loss1(expir) _).tupled(allparams.splitAt(split))
+            def dloss1opt(allparams:Seq[Float]) = {
+                val (dgparams,dparams) = (dloss1(expir) _).tupled(allparams.splitAt(split))
+                dgparams ++ dparams
+            }
+            optimize(loss1opt,dloss1opt,allparams)._2
         }
     }
 
