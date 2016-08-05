@@ -51,7 +51,7 @@ package irms {
 
     }
 
-    trait LineShapeWithLoss extends LineShape {
+    trait PlainLoss extends LineShape {
         // Loss functions
         // The difference between loss1 and loss is, loss is the final loss value that
         // will be used by users, while loss1 is a single frame loss which might be
@@ -60,7 +60,7 @@ package irms {
         def loss(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = loss1(expir)(gparams,params)
     }
 
-    trait OptimizedLoss extends LineShapeWithLoss {
+    trait OptimizedLoss extends PlainLoss {
 
         // derivative of baseline with respect to gparams
         def dbaseline(gparams:Seq[Float])(x:Float):Seq[Float]
@@ -105,7 +105,7 @@ package irms {
 
     object Loss {
         object Euclidean{
-            trait loss extends LineShapeWithLoss {
+            trait loss extends PlainLoss {
                 import LineShapeHelpers._
                 // sum( i from 0 to n, ( thir(xi)-expir(xi) ) ^ 2 )
                 def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
