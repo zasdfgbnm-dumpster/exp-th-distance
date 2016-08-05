@@ -103,23 +103,36 @@ package irms {
         }
     }
 
-    trait EuclideanLoss extends OptimizedLoss {
-        import LineShapeHelpers._
-
-        // formula:
-        // sum( i from 0 to n, ( thir(xi)-expir(xi) ) ^ 2 )
-        def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
-            (vec(thir(gparams,params)),expir).zipped.map((a,b)=>(a-b)*(a-b)).reduce(_+_)
+    object Loss {
+        object Euclidean{
+            trait loss extends LineShapeWithLoss {
+                import LineShapeHelpers._
+                // sum( i from 0 to n, ( thir(xi)-expir(xi) ) ^ 2 )
+                def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
+                    (vec(thir(gparams,params)),expir).zipped.map((a,b)=>(a-b)*(a-b)).reduce(_+_)
+                }
+            }
+            trait derivative extends OptimizedLoss {
+                import LineShapeHelpers._
+                // sum( i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * d(thir(xi))/d(parameters) )
+                def dloss1(expir:Seq[Float])(gparams:Seq[Float],params:Seq[Float]):(Seq[Float],Seq[Float]) = {
+                    def d1(x:Float,expir1:Float) = cmult(dthir(gparams,params)(x), 2*(thir(gparams,params)(x)-expir1))
+                    (X.xs,expir).zipped.map(d1).reduce(cplus[(Seq[Float], Seq[Float])])
+                }
+            }
         }
+    }
 
-        // d(euclidean)/d(parameters)
-        // formula:
-        // sum( i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * d(thir(xi))/d(parameters) )
-        def dloss1(expir:Seq[Float])(gparams:Seq[Float],params:Seq[Float]):(Seq[Float],Seq[Float]) = {
-            def d1(x:Float,expir1:Float) = cmult(dthir(gparams,params)(x), 2*(thir(gparams,params)(x)-expir1))
-            (X.xs,expir).zipped.map(d1).reduce(cplus[(Seq[Float], Seq[Float])])
-        }
+    object Peak {
+        //TODO: put peaks' f1  here
+    }
 
+    object Baseline {
+        //TODO: put baseline here
+    }
+
+    object Optimizer {
+        //TODO: put optimizers here
     }
 
 }
