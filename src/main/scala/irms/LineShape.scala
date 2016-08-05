@@ -51,59 +51,60 @@ package irms {
 
     }
 
-    trait PlainLoss extends LineShape {
-        // Loss functions
-        // The difference between loss1 and loss is, loss is the final loss value that
-        // will be used by users, while loss1 is a single frame loss which might be
-        // adjusted further by the class
-        def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float
-        def loss(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = loss1(expir)(gparams,params)
-    }
-
-    trait OptimizedLoss extends PlainLoss {
-
-        // derivative of baseline with respect to gparams
-        def dbaseline(gparams:Seq[Float])(x:Float):Seq[Float]
-
-        // df1: derivative of f1 with gparams and params1.
-        // return_value._1 are derivative with gparams, return_value._2 are with params1
-        def df1(freq:Float,max:Float,gparams:Seq[Float],params1:Seq[Float])(x:Float):(Seq[Float],Seq[Float])
-
-        // dloss1: derivative of loss1 w.r.t. gparams and params
-        // return_value._1 are derivative with gparams, return_value._2 are with params
-        def dloss1(expir:Seq[Float])(gparams:Seq[Float],params:Seq[Float]):(Seq[Float],Seq[Float])
-
-        // derivative of theoretical spectrum vector with gparams and params
-        // formula:
-        // d(thir(xi))/d(gparams) = d(baseline(xi))/d(gparams) + sum( j from 0 to m, d(f1(xi))/d(gparams) )
-        // d(thir(xi))/d(params1j) = d(f1(xi))/d(params1j)
-        def dthir(gparams:Seq[Float], params:Seq[Float])(x:Float):(Seq[Float],Seq[Float]) = {
-            import LineShapeHelpers.cplus
-            val dbaseline_dgparams = dbaseline(gparams)(x)
-            val (df1s_dgparams,df1s_dparams1s) = fxs(df1,gparams,params)(x).unzip
-            val dthir_dgparams = cplus(dbaseline_dgparams,df1s_dgparams.reduce(cplus[Seq[Float]]))
-            (dthir_dgparams,df1s_dparams1s.flatMap(a=>a))
-        }
-
-        // the function that optimize parameters to minimize loss1
-        // the return value is optimized (allparams,f)
-        def optimize(f:(Seq[Float])=>Float, df:(Seq[Float])=>Seq[Float], initial:Seq[Float]):(Seq[Float],Float)
-
-        // the final loss function after optimization
-        override def loss(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
-            // adapt loss1 and dloss1 to optimize
-            val split = gparams.length
-            val allparams = gparams++params
-            def loss1opt(allparams:Seq[Float]) = (loss1(expir) _).tupled(allparams.splitAt(split))
-            def dloss1opt(allparams:Seq[Float]) = {
-                val (dgparams,dparams) = (dloss1(expir) _).tupled(allparams.splitAt(split))
-                dgparams ++ dparams
-            }
-            optimize(loss1opt,dloss1opt,allparams)._2
-        }
-    }
-
     object Loss {
+        
+        trait PlainLoss extends LineShape {
+            // Loss functions
+            // The difference between loss1 and loss is, loss is the final loss value that
+            // will be used by users, while loss1 is a single frame loss which might be
+            // adjusted further by the class
+            def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float
+            def loss(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = loss1(expir)(gparams,params)
+        }
+
+        trait OptimizedLoss extends PlainLoss {
+
+            // derivative of baseline with respect to gparams
+            def dbaseline(gparams:Seq[Float])(x:Float):Seq[Float]
+
+            // df1: derivative of f1 with gparams and params1.
+            // return_value._1 are derivative with gparams, return_value._2 are with params1
+            def df1(freq:Float,max:Float,gparams:Seq[Float],params1:Seq[Float])(x:Float):(Seq[Float],Seq[Float])
+
+            // dloss1: derivative of loss1 w.r.t. gparams and params
+            // return_value._1 are derivative with gparams, return_value._2 are with params
+            def dloss1(expir:Seq[Float])(gparams:Seq[Float],params:Seq[Float]):(Seq[Float],Seq[Float])
+
+            // derivative of theoretical spectrum vector with gparams and params
+            // formula:
+            // d(thir(xi))/d(gparams) = d(baseline(xi))/d(gparams) + sum( j from 0 to m, d(f1(xi))/d(gparams) )
+            // d(thir(xi))/d(params1j) = d(f1(xi))/d(params1j)
+            def dthir(gparams:Seq[Float], params:Seq[Float])(x:Float):(Seq[Float],Seq[Float]) = {
+                import LineShapeHelpers.cplus
+                val dbaseline_dgparams = dbaseline(gparams)(x)
+                val (df1s_dgparams,df1s_dparams1s) = fxs(df1,gparams,params)(x).unzip
+                val dthir_dgparams = cplus(dbaseline_dgparams,df1s_dgparams.reduce(cplus[Seq[Float]]))
+                (dthir_dgparams,df1s_dparams1s.flatMap(a=>a))
+            }
+
+            // the function that optimize parameters to minimize loss1
+            // the return value is optimized (allparams,f)
+            def optimize(f:(Seq[Float])=>Float, df:(Seq[Float])=>Seq[Float], initial:Seq[Float]):(Seq[Float],Float)
+
+            // the final loss function after optimization
+            override def loss(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
+                // adapt loss1 and dloss1 to optimize
+                val split = gparams.length
+                val allparams = gparams++params
+                def loss1opt(allparams:Seq[Float]) = (loss1(expir) _).tupled(allparams.splitAt(split))
+                def dloss1opt(allparams:Seq[Float]) = {
+                    val (dgparams,dparams) = (dloss1(expir) _).tupled(allparams.splitAt(split))
+                    dgparams ++ dparams
+                }
+                optimize(loss1opt,dloss1opt,allparams)._2
+            }
+        }
+
         object Euclidean{
             trait loss extends PlainLoss {
                 import LineShapeHelpers._
