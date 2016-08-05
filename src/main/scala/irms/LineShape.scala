@@ -103,40 +103,23 @@ package irms {
         }
     }
 
-    // object loss {
-    //     // total loss:
-    //     // formula:
-    //     // euclidean_loss = sum( i from 0 to n, ( thir(xi)-expir(xi) ) ^ 2 )
-    //     def euclidean(gparams:Seq[Float], params:Seq[Float]):Float = {
-    //         (vec(thir(gparams,params)),expir).zipped.map((a,b)=>(a-b)*(a-b)).reduce(_+_)
-    //     }
-    //
-    //     d(euclidean)/d(parameters)
-    //     formula:
-    //     derivative_gparams = sum( i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * d(thir(xi))/d(gparameters) )
-    //                        = sum{ i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * ( derivativeb + sum { j from 0 to m, derivativef1(freqj,maxj)(gparams,param1j)(xi)._1 })}
-    //     derivative_params  = sum( i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * d(thir(xi))/d(parameters) )
-    //                        = [ sum{ i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * derivativef1(freqj,maxj)(gparams,param1j)(xi)._2 } for j from 0 to m ]
-    //     def deuclidean(gparams:Seq[Float], params:Seq[Float]):(Seq[Float],Seq[Float]) = {
-    //         // split params into [param1]
-    //         val param1s = splitparams(params)
-    //         // apply (gparams,params1) to derivativef1(freq,max)
-    //         val dparams = (df1s,param1s).zipped.map(_(gparams,_))
-    //         // calculate 2 * ( thir(xi)-expir(xi) ) for all xi
-    //         val diff2 = (thirvec(gparams,params),expir).zipped.map(2*(_-_))
-    //         // calculate the sum{ i from 0 to n,.... } for peaks
-    //         def sumi_calculator(d:Float=>(Seq[Float],Seq[Float])):(Seq[Float],Seq[Float]) = {
-    //             val diff2deriv = (xs,diff2).zipped.map(cmult(d(_),_))
-    //             diff2deriv.reduce(cplus[(Seq[Float],Seq[Float])])
-    //         }
-    //         val sumi = dparams.map(sumi_calculator)
-    //         val dgparams_peaks = sumi.map(_._1).reduce(cplus[Seq[Float]])
-    //         val dparams_peaks = sumi.flatMap(_._2)
-    //         // calculate the sum{ i from 0 to n,.... } for baseline
-    //         val dgparams_baseline = (xs,diff2).zipped.map(cmult(baseline(gparams)(_),_))
-    //         // final result
-    //         ( cplus(dgparams_peaks,dgparams_baseline) , dparams_peaks )
-    //     }
-    // }
+    trait EuclideanLoss extends OptimizedLoss {
+        import LineShapeHelpers._
+
+        // formula:
+        // sum( i from 0 to n, ( thir(xi)-expir(xi) ) ^ 2 )
+        override def loss1(expir:Seq[Float])(gparams:Seq[Float], params:Seq[Float]):Float = {
+            (vec(thir(gparams,params)),expir).zipped.map((a,b)=>(a-b)*(a-b)).reduce(_+_)
+        }
+
+        // d(euclidean)/d(parameters)
+        // formula:
+        // sum( i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * d(thir(xi))/d(parameters) )
+        def dloss1(expir:Seq[Float])(gparams:Seq[Float],params:Seq[Float]):(Seq[Float],Seq[Float]) = {
+            def d1(x:Float,expir1:Float) = cmult(dthir(gparams,params)(x), 2*(thir(gparams,params)(x)-expir1))
+            (X.xs,expir).zipped.map(d1).reduce(cplus[(Seq[Float], Seq[Float])])
+        }
+
+    }
 
 }
