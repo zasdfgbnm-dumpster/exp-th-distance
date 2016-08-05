@@ -9,16 +9,14 @@ package irms {
         import X.xs
         import LineShapeHelpers.vec
 
-        private class TestGaussian(peaks:Seq[(Float,Float)]) extends LineShape(Seq[Float](),peaks) {
+        private class TestGaussian(peaks:Seq[(Float,Float)]) extends LineShape(peaks) {
             override val nparams1:Int = 0
             val s = 20
             def baseline(gparams:Seq[Float])(x:Float):Float = x * 0.01f
-            def dbaseline(gparams:Seq[Float])(x:Float):Seq[Float] = gparams
             def f1(freq:Float,max:Float,gparams:Seq[Float], params1:Seq[Float])(x:Float):Float = {
                 val xx = (x-freq)/s
                 max * exp(-xx*xx).toFloat
             }
-            def df1(freq:Float,max:Float,gparams:Seq[Float], params1:Seq[Float])(x:Float):(Seq[Float],Seq[Float]) = (gparams,gparams)
         }
 
         def main(args: Array[String]):Unit = {
