@@ -7,10 +7,11 @@ package irms {
 
     object DistExpTh {
 
-        private class Lorentz(peaks:Seq[(Double,Double)]) extends LineShape(peaks) with Optimizer.LBFGSOptimizer with Loss.Euclidean.Optmized with Functions.ZeroBaseline.Optimized {
+        private class Lorentz(peaks:Seq[(Double,Double)]) extends LineShape(peaks) with Optimizer.SimpleSGDOptimizer with Loss.Euclidean.Optmized with Functions.ZeroBaseline.Optimized {
+            val r = scala.util.Random
             val nparams1:Int = 1
-            val gparams:Seq[Double] = Seq(1.0/peaks.unzip._2.max)
-            val params:Seq[Double] = Seq.fill(peaks.length*nparams1)(10.0)
+            def gparams:Seq[Double] = Seq(1.0/peaks.unzip._2.max*(0.7+1.3*r.nextDouble))
+            def params:Seq[Double] = Range(0,peaks.length*nparams1).map(j=>r.nextDouble*20+5)
             def f1(freq:Double,intensity:Double,gparams:Seq[Double],params1:Seq[Double])(x:Double):Double = {
                 val scaled_freq = freq * 0.960
                 val a = intensity * gparams(0)
@@ -46,15 +47,15 @@ package irms {
             val thir_b3lyp631gd = thir.filter(_.method=="B3LYP/6-31G*")
             val expir_selected = expir.filter(_.state=="gas")
                                       .joinWith(mid_structure,mid_structure("mid")===expir("mid"))
-                                      .map(j=>MyExpIR(j._2.smiles,j._1.vec)).limit(3)
+                                      .map(j=>MyExpIR(j._2.smiles,j._1.vec)).limit(4)
             val thir_selected = thir_b3lyp631gd.joinWith(expir_selected,expir_selected("smiles")===thir_b3lyp631gd("smiles"))
-                                               .map(j=>MyThIR(j._1.smiles,j._1.freqs)).limit(3)
+                                               .map(j=>MyThIR(j._1.smiles,j._1.freqs)).limit(4)
             // calculate distances
             def calculate_distance(j:(MyThIR,MyExpIR)):MyDis = {
                 val (th,exp) = j
                 val calculator = new Lorentz(th.freqs.toSeq)
                 val d = calculator.loss(exp.vec.toSeq)
-                val thvec = LineShapeHelpers.vec(calculator.thir(calculator.gparams,calculator.params))
+                val thvec = LineShapeHelpers.vec(calculator.thir(calculator.final_gparams.get,calculator.final_params.get))
                 MyDis(th.smiles,exp.smiles,exp.vec,thvec.toArray,d)
             }
             val distances = thir_selected.joinWith(expir_selected,expr("1>0")).repartition(400).map(calculate_distance _)

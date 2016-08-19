@@ -56,8 +56,8 @@ package irms {
     object Loss {
 
         trait PlainLoss extends LineShape {
-            val gparams:Seq[Double]
-            val params:Seq[Double]
+            def gparams:Seq[Double]
+            def params:Seq[Double]
             // Loss functions
             // The difference between loss1 and loss is, loss is the final loss value that
             // will be used by users, while loss1 is a single frame loss which might be
@@ -101,8 +101,10 @@ package irms {
             // the final loss function after optimization
             override def loss(expir:Seq[Double]):Double = {
                 // adapt loss1 and dloss1 to optimize
-                val split = gparams.length
-                val allparams = gparams++params
+                val mygparams = gparams
+                val myparams = params
+                val split = mygparams.length
+                val allparams = mygparams++myparams
                 def loss1opt(allparams:Seq[Double]) = (loss1(expir) _).tupled(allparams.splitAt(split))
                 def dloss1opt(allparams:Seq[Double]) = {
                     val (dgparams,dparams) = (dloss1(expir) _).tupled(allparams.splitAt(split))
@@ -113,6 +115,26 @@ package irms {
                 final_gparams = Some(final_allparams_splited._1)
                 final_params = Some(final_allparams_splited._2)
                 final_loss
+            }
+        }
+
+        trait RepeatedOptimizedLoss extends OptimizedLoss {
+            override def loss(expir:Seq[Double]):Double = {
+                var remain_trials = 100
+                var min_loss = super.loss(expir)
+                var min_gparams = final_gparams
+                var min_params = final_gparams
+                while(remain_trials>0){
+                    remain_trials -= 1
+                    val new_loss = super.loss(expir)
+                    if(new_loss>min_loss) {
+                        final_gparams = min_gparams
+                        min_params = min_params
+                    } else {
+                        min_loss = new_loss
+                    }
+                }
+                min_loss
             }
         }
 
@@ -171,7 +193,7 @@ package irms {
         }
         trait SimpleSGDOptimizer extends BreezeOptimizer {
             import breeze.optimize.StochasticGradientDescent._
-            override protected val optimizer = new SimpleSGD[DV](0.1,1000)
+            override protected val optimizer = new SimpleSGD[DV](0.05,1000)
         }
     }
 
