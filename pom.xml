@@ -39,7 +39,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>irms.Tests</mainClass>
+                            <mainClass>irms.DistExpTh</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

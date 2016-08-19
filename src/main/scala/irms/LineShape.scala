@@ -31,44 +31,52 @@ package irms {
 
         // f1: the line shape of a single peak,
         // gparams are global parameters (shared with baseline), params1 are local parameters
-        def f1(freq:Double,max:Double,gparams:Seq[Double],params1:Seq[Double])(x:Double):Double
+        def f1(freq:Double,intensity:Double,gparams:Seq[Double],params1:Seq[Double])(x:Double):Double
 
         // evaluate f(x) for each theoretical peak
         // TODO: maybe it's better to set this as private?
         def fxs[R](f:(Double,Double,Seq[Double],Seq[Double])=>Double=>R, gparams:Seq[Double], params:Seq[Double])(x:Double):Seq[R] = {
             val param1s = if(nparams1==0) peaks.map(j=>Seq[Double]())
                           else params.sliding(nparams1,nparams1).toSeq
-            val (freqs,maxs) = peaks.unzip
-            (freqs,maxs,param1s).zipped.map( (a,b,c)=>f(a,b,gparams,c)(x) )
+            val (freqs,intensitys) = peaks.unzip
+            (freqs,intensitys,param1s).zipped.map( (a,b,c)=>f(a,b,gparams,c)(x) )
         }
 
         // theoretical spectrum vector
         // formula:
-        // thir(xi) = sum( j from 0 to m, f1(freqj,maxj)(gparams,params1j)(xi) ) + baseline(gparams)(xi)
+        // thir(xi) = sum( j from 0 to m, f1(freqj,intensityj)(gparams,params1j)(xi) ) + baseline(gparams)(xi)
         def thir(gparams:Seq[Double], params:Seq[Double])(x:Double):Double = {
             fxs(f1,gparams,params)(x).reduce(_+_) + baseline(gparams)(x)
         }
+
+        // loss function
+        def loss(expir:Seq[Double]):Double
     }
 
     object Loss {
 
         trait PlainLoss extends LineShape {
+            val gparams:Seq[Double]
+            val params:Seq[Double]
             // Loss functions
             // The difference between loss1 and loss is, loss is the final loss value that
             // will be used by users, while loss1 is a single frame loss which might be
             // adjusted further by the class
             def loss1(expir:Seq[Double])(gparams:Seq[Double], params:Seq[Double]):Double
-            def loss(expir:Seq[Double])(gparams:Seq[Double], params:Seq[Double]):Double = loss1(expir)(gparams,params)
+            def loss(expir:Seq[Double]):Double = loss1(expir)(gparams,params)
         }
 
         trait OptimizedLoss extends PlainLoss {
+
+            var final_gparams:Option[Seq[Double]] = None
+            var final_params:Option[Seq[Double]] = None
 
             // derivative of baseline with respect to gparams
             def dbaseline(gparams:Seq[Double])(x:Double):Seq[Double]
 
             // df1: derivative of f1 with gparams and params1.
             // return_value._1 are derivative with gparams, return_value._2 are with params1
-            def df1(freq:Double,max:Double,gparams:Seq[Double],params1:Seq[Double])(x:Double):(Seq[Double],Seq[Double])
+            def df1(freq:Double,intensity:Double,gparams:Seq[Double],params1:Seq[Double])(x:Double):(Seq[Double],Seq[Double])
 
             // dloss1: derivative of loss1 w.r.t. gparams and params
             // return_value._1 are derivative with gparams, return_value._2 are with params
@@ -91,7 +99,7 @@ package irms {
             def optimize(f:(Seq[Double])=>Double, df:(Seq[Double])=>Seq[Double], initial:Seq[Double]):(Seq[Double],Double)
 
             // the final loss function after optimization
-            override def loss(expir:Seq[Double])(gparams:Seq[Double], params:Seq[Double]):Double = {
+            override def loss(expir:Seq[Double]):Double = {
                 // adapt loss1 and dloss1 to optimize
                 val split = gparams.length
                 val allparams = gparams++params
@@ -100,19 +108,23 @@ package irms {
                     val (dgparams,dparams) = (dloss1(expir) _).tupled(allparams.splitAt(split))
                     dgparams ++ dparams
                 }
-                optimize(loss1opt,dloss1opt,allparams)._2
+                val (final_allparams,final_loss) = optimize(loss1opt,dloss1opt,allparams)
+                val final_allparams_splited = final_allparams.splitAt(split)
+                final_gparams = Some(final_allparams_splited._1)
+                final_params = Some(final_allparams_splited._2)
+                final_loss
             }
         }
 
         object Euclidean{
-            trait loss extends PlainLoss {
+            trait Plain extends PlainLoss {
                 import LineShapeHelpers._
                 // sum( i from 0 to n, ( thir(xi)-expir(xi) ) ^ 2 )
                 def loss1(expir:Seq[Double])(gparams:Seq[Double], params:Seq[Double]):Double = {
                     (vec(thir(gparams,params)),expir).zipped.map((a,b)=>(a-b)*(a-b)).reduce(_+_)
                 }
             }
-            trait derivative extends OptimizedLoss {
+            trait Optmized extends Plain with OptimizedLoss {
                 import LineShapeHelpers._
                 // sum( i from 0 to n, 2 * ( thir(xi)-expir(xi) ) * d(thir(xi))/d(parameters) )
                 def dloss1(expir:Seq[Double])(gparams:Seq[Double],params:Seq[Double]):(Seq[Double],Seq[Double]) = {
@@ -123,12 +135,16 @@ package irms {
         }
     }
 
-    object Peak {
-        //TODO: put peaks' f1  here
-    }
 
-    object Baseline {
-        //TODO: put baseline here
+    object Functions {
+        object ZeroBaseline {
+            trait Plain extends LineShape {
+                def baseline(gparams:Seq[Double])(x:Double):Double = 0
+            }
+            trait Optimized extends Plain with Loss.OptimizedLoss {
+                def dbaseline(gparams:Seq[Double])(x:Double):Seq[Double] = Seq.fill(gparams.length)(0.0)
+            }
+        }
     }
 
     object Optimizer {
@@ -152,6 +168,10 @@ package irms {
         trait LBFGSOptimizer extends BreezeOptimizer {
             import breeze.optimize._
             override protected val optimizer = new LBFGS[DV]()
+        }
+        trait SimpleSGDOptimizer extends BreezeOptimizer {
+            import breeze.optimize.StochasticGradientDescent._
+            override protected val optimizer = new SimpleSGD[DV](0.1,1000)
         }
     }
 
