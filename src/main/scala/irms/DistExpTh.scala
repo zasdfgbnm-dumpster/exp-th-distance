@@ -1,11 +1,32 @@
-import org.apache.spark.sql._
-import org.apache.spark._
-import org.apache.spark.sql.functions._
-import scala.math._
-
 package irms {
 
     object DistExpTh {
+
+        private class Gaussian(peaks:Seq[(Double,Double)]) extends LineShape(peaks) with Optimizer.SimpleSGDOptimizer with Loss.Euclidean.Optmized with Functions.ZeroBaseline.Optimized {
+            import scala.math._
+            val r = scala.util.Random
+            val nparams1:Int = 1
+            def gparams:Seq[Double] = Seq(1.0/peaks.unzip._2.max*(0.7+1.3*r.nextDouble))
+            def params:Seq[Double] = Range(0,peaks.length*nparams1).map(j=>r.nextDouble*10+5)
+            def f1(freq:Double,intensity:Double,gparams:Seq[Double],params1:Seq[Double])(x:Double):Double = {
+                val scaled_freq = freq * 0.960
+                val a = intensity * gparams(0)
+                val w = params1(0)
+                val d = ( x - scaled_freq )
+                val scaled_d = d/w
+                (a/w) * exp(-scaled_d*scaled_d)
+            }
+            def df1(freq:Double,intensity:Double,gparams:Seq[Double],params1:Seq[Double])(x:Double):(Seq[Double],Seq[Double]) = {
+                val f1val = f1(freq,intensity,gparams,params1)(x)
+                val scaled_freq = freq * 0.960
+                val a = intensity * gparams(0)
+                val w = params1(0)
+                val d = ( x - scaled_freq )
+                val df1_da = f1val/a
+                val df1_dw = f1val*(2*d*d-w*w)/(w*w*w)
+                (Seq(df1_da),Seq(df1_dw))
+            }
+        }
 
         private class Lorentz(peaks:Seq[(Double,Double)]) extends LineShape(peaks) with Optimizer.SimpleSGDOptimizer with Loss.Euclidean.Optmized with Functions.ZeroBaseline.Optimized {
             val r = scala.util.Random
@@ -36,6 +57,9 @@ package irms {
         case class MyDis(th_smiles:String,exp_smiles:String,expvec:Array[Double],thvec:Array[Double],distance:Double)
 
         def main(args: Array[String]):Unit = {
+            import org.apache.spark.sql._
+            import org.apache.spark._
+            import org.apache.spark.sql.functions._
             // read tables
             val session = SparkSession.builder.appName("d(thir,expir)").getOrCreate()
             import session.implicits._
@@ -57,7 +81,7 @@ package irms {
             // calculate distances
             def calculate_distance(j:(MyThIR,MyExpIR)):MyDis = {
                 val (th,exp) = j
-                val calculator = new Lorentz(th.freqs.toSeq)
+                val calculator = new Gaussian(th.freqs.toSeq)
                 val d = calculator.loss(exp.vec.toSeq)
                 val thvec = LineShapeHelpers.vec(calculator.thir(calculator.final_gparams.get,calculator.final_params.get))
                 MyDis(th.smiles,exp.smiles,exp.vec,thvec.toArray,d)
