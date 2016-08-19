@@ -44,10 +44,14 @@ package irms {
             val expir = session.read.parquet(path+"/expir").as[ExpIRAndState]
             val thir = session.read.parquet(path+"/thir").as[TheoreticalIR]
             // get all gas phases
+            def normalize_vec(expir:MyExpIR):MyExpIR = {
+                MyExpIR(expir.smiles,LineShapeHelpers.cmult(expir.vec.toSeq,1.0/expir.vec.max).toArray)
+            }
             val thir_b3lyp631gd = thir.filter(_.method=="B3LYP/6-31G*")
             val expir_selected = expir.filter(_.state=="gas")
                                       .joinWith(mid_structure,mid_structure("mid")===expir("mid"))
                                       .map(j=>MyExpIR(j._2.smiles,j._1.vec)).limit(4)
+                                      .map(normalize_vec _)
             val thir_selected = thir_b3lyp631gd.joinWith(expir_selected,expir_selected("smiles")===thir_b3lyp631gd("smiles"))
                                                .map(j=>MyThIR(j._1.smiles,j._1.freqs)).limit(4)
             // calculate distances

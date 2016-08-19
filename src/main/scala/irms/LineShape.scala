@@ -193,7 +193,7 @@ package irms {
         }
         trait SimpleSGDOptimizer extends BreezeOptimizer {
             import breeze.optimize.StochasticGradientDescent._
-            override protected val optimizer = new SimpleSGD[DV](0.05,1000)
+            override protected val optimizer = new SimpleSGD[DV](0.05)
         }
     }
 
