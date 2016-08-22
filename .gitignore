@@ -1,3 +1,6 @@
 target
 .ipynb_checkpoints
 distances
+rd
+*.log
+tables

@@ -52,32 +52,38 @@ package irms {
             }
         }
 
+        val path = "/ufrc/roitberg/qasdfgtyuiop/tables"
+        val resultpath = "/ufrc/roitberg/qasdfgtyuiop/exp-th-dis"
+
         case class MyExpIR(smiles:String,vec:Array[Double])
         case class MyThIR(smiles:String, freqs:Array[(Double,Double)])
         case class MyDis(th_smiles:String,exp_smiles:String,expvec:Array[Double],thvec:Array[Double],distance:Double)
+        case class MyRD(th_smiles:String,rank:Int,d:Double,mistakes:Array[String],ds:Array[Double])
 
         def main(args: Array[String]):Unit = {
             import org.apache.spark.sql._
             import org.apache.spark._
             import org.apache.spark.sql.functions._
+
             // read tables
             val session = SparkSession.builder.appName("d(thir,expir)").getOrCreate()
             import session.implicits._
-            val path = "/home/gaoxiang/irms/create-dataset-for-ir/outputs/tables"
             val mid_structure = session.read.parquet(path+"/mid_structure").as[MIDStruct]
             val expir = session.read.parquet(path+"/expir").as[ExpIRAndState]
             val thir = session.read.parquet(path+"/thir").as[TheoreticalIR]
-            // get all gas phases
+
+            // select data
             def normalize_vec(expir:MyExpIR):MyExpIR = {
                 MyExpIR(expir.smiles,LineShapeHelpers.cmult(expir.vec.toSeq,1.0/expir.vec.max).toArray)
             }
             val thir_b3lyp631gd = thir.filter(_.method=="B3LYP/6-31G*")
             val expir_selected = expir.filter(_.state=="gas")
                                       .joinWith(mid_structure,mid_structure("mid")===expir("mid"))
-                                      .map(j=>MyExpIR(j._2.smiles,j._1.vec)).limit(4)
+                                      .map(j=>MyExpIR(j._2.smiles,j._1.vec))
                                       .map(normalize_vec _)
             val thir_selected = thir_b3lyp631gd.joinWith(expir_selected,expir_selected("smiles")===thir_b3lyp631gd("smiles"))
-                                               .map(j=>MyThIR(j._1.smiles,j._1.freqs)).limit(4)
+                                               .map(j=>MyThIR(j._1.smiles,j._1.freqs))
+
             // calculate distances
             def calculate_distance(j:(MyThIR,MyExpIR)):MyDis = {
                 val (th,exp) = j
@@ -86,12 +92,23 @@ package irms {
                 val thvec = LineShapeHelpers.vec(calculator.thir(calculator.final_gparams.get,calculator.final_params.get))
                 MyDis(th.smiles,exp.smiles,exp.vec,thvec.toArray,d)
             }
-            val distances = thir_selected.joinWith(expir_selected,expr("1>0")).repartition(400).map(calculate_distance _)
+            val distances = thir_selected.joinWith(expir_selected,expr("true")).repartition(4000).map(calculate_distance _)
             distances.show()
-
-            // write result to file
-            val resultpath = "/home/gaoxiang/irms/exp-th-distance"
             distances.write.parquet(resultpath+"/distances")
+
+            // plot distance vs rank
+            val ed = distances.rdd.map(j=>(j.th_smiles,(j.distance,j.exp_smiles))).groupByKey()
+            def ed2rd(ed:(String,Iterable[(Double,String)])):MyRD = {
+                val ed2s = ed._2.toSeq
+                val th_smiles = ed._1
+                val l = ed2s.sorted
+                val ((d,_),r) = l.zipWithIndex.find(j=>j._1._2==th_smiles).get
+                val mistakes = ed2s.splitAt(r)._1.unzip._2.toArray
+                MyRD(th_smiles,r,d,mistakes,l.unzip._1.toArray)
+            }
+            val rd = ed.map(ed2rd).toDS
+            rd.show()
+            rd.write.parquet(resultpath+"/rd")
         }
     }
 }
