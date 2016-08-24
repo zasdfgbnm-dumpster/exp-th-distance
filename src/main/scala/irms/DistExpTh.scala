@@ -57,17 +57,18 @@ package irms {
 
         case class MyExpIR(smiles:String,vec:Array[Double])
         case class MyThIR(smiles:String, freqs:Array[(Double,Double)])
-        case class MyDis(th_smiles:String,exp_smiles:String,expvec:Array[Double],thvec:Array[Double],distance:Double)
-        case class MyRD(th_smiles:String,rank:Int,d:Double,mistakes:Array[String],ds:Array[Double])
+        case class MyRD(th_smiles:String,rank:Int,distance:Double,mistakes:Array[String],distances:Array[Double])
 
         def main(args: Array[String]):Unit = {
+
             import org.apache.spark.sql._
             import org.apache.spark._
             import org.apache.spark.sql.functions._
 
-            // read tables
             val session = SparkSession.builder.appName("d(thir,expir)").getOrCreate()
             import session.implicits._
+
+            // pick data
             val mid_structure = session.read.parquet(path+"/mid_structure").as[MIDStruct]
             val expir = session.read.parquet(path+"/expir").as[ExpIRAndState]
             val thir = session.read.parquet(path+"/thir").as[TheoreticalIR]
@@ -81,32 +82,19 @@ package irms {
                                       .joinWith(mid_structure,mid_structure("mid")===expir("mid"))
                                       .map(j=>MyExpIR(j._2.smiles,j._1.vec))
                                       .map(normalize_vec _)
+            val expir_local = expir_selected.collect().toSeq
             val thir_selected = thir_b3lyp631gd.joinWith(expir_selected,expir_selected("smiles")===thir_b3lyp631gd("smiles"))
                                                .map(j=>MyThIR(j._1.smiles,j._1.freqs))
 
             // calculate distances
-            def calculate_distance(j:(MyThIR,MyExpIR)):MyDis = {
-                val (th,exp) = j
+            def thir2rd(th:MyThIR):MyRD = {
                 val calculator = new Gaussian(th.freqs.toSeq)
-                val d = calculator.loss(exp.vec.toSeq)
-                val thvec = LineShapeHelpers.vec(calculator.thir(calculator.final_gparams.get,calculator.final_params.get))
-                MyDis(th.smiles,exp.smiles,exp.vec,thvec.toArray,d)
+                val distance_smiles = expir_local.map(j=>(calculator.loss(j.vec.toSeq),j.smiles)).sorted
+                val ((distance,_),rank) = distance_smiles.zipWithIndex.find(j=>j._1._2==th.smiles).get
+                val mistakes = distance_smiles.splitAt(rank)._1.unzip._2.toArray
+                MyRD(th.smiles,rank,distance,mistakes,distance_smiles.unzip._1.toArray)
             }
-            val distances = thir_selected.joinWith(expir_selected,expr("true")).repartition(4000).map(calculate_distance _)
-            distances.show()
-            distances.write.parquet(resultpath+"/distances")
-
-            // plot distance vs rank
-            val ed = distances.rdd.map(j=>(j.th_smiles,(j.distance,j.exp_smiles))).groupByKey()
-            def ed2rd(ed:(String,Iterable[(Double,String)])):MyRD = {
-                val ed2s = ed._2.toSeq
-                val th_smiles = ed._1
-                val l = ed2s.sorted
-                val ((d,_),r) = l.zipWithIndex.find(j=>j._1._2==th_smiles).get
-                val mistakes = ed2s.splitAt(r)._1.unzip._2.toArray
-                MyRD(th_smiles,r,d,mistakes,l.unzip._1.toArray)
-            }
-            val rd = ed.map(ed2rd).toDS
+            val rd = thir_selected.map(thir2rd _)
             rd.show()
             rd.write.parquet(resultpath+"/rd")
         }
