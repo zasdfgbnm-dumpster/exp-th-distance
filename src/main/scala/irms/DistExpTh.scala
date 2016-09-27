@@ -54,10 +54,12 @@ package irms {
 
         val path = "/ufrc/roitberg/qasdfgtyuiop/tables"
         val resultpath = "/ufrc/roitberg/qasdfgtyuiop/exp-th-dis"
+        // val path = "tables"
+        // val resultpath = "."
 
         case class MyExpIR(smiles:String,vec:Array[Double])
         case class MyThIR(smiles:String, freqs:Array[(Double,Double)])
-        case class MyRD(th_smiles:String,rank:Int,distance:Double,mistakes:Array[String],distances:Array[Double])
+        case class MyRD(exp_smiles:String,rank:Int,distance:Double,mistakes:Array[String],distances:Array[Double])
 
         def main(args: Array[String]):Unit = {
 
@@ -78,23 +80,30 @@ package irms {
                 MyExpIR(expir.smiles,LineShapeHelpers.cmult(expir.vec.toSeq,1.0/expir.vec.max).toArray)
             }
             val thir_b3lyp631gd = thir.filter(_.method=="B3LYP/6-31G*")
-            val expir_selected = expir.filter(_.state=="gas")
-                                      .joinWith(mid_structure,mid_structure("mid")===expir("mid"))
-                                      .map(j=>MyExpIR(j._2.smiles,j._1.vec))
-                                      .map(normalize_vec _)
-            val expir_local = expir_selected.collect().toSeq
-            val thir_selected = thir_b3lyp631gd.joinWith(expir_selected,expir_selected("smiles")===thir_b3lyp631gd("smiles"))
-                                               .map(j=>MyThIR(j._1.smiles,j._1.freqs))
+            val expir_gas = expir.filter(_.state=="gas")
+            val thir_selected = thir_b3lyp631gd.map(j=>MyThIR(j.smiles,j.freqs))
+            val thir_local = thir_selected.collect().toSeq
+            val expir_converted = expir_gas.joinWith(mid_structure,mid_structure("mid")===expir("mid"))
+                                           .map(j=>MyExpIR(j._2.smiles,j._1.vec))
+            val expir_normalized = expir_converted.map(normalize_vec _)
+            val expir_included = expir_normalized.joinWith(thir_selected,expir_normalized("smiles")===thir_selected("smiles")).map(_._1)
+            val count_expir = expir_included.count().toInt
 
             // calculate distances
-            def thir2rd(th:MyThIR):MyRD = {
-                val calculator = new Gaussian(th.freqs.toSeq)
-                val distance_smiles = expir_local.map(j=>(calculator.loss(j.vec.toSeq),j.smiles)).sorted
-                val ((distance,_),rank) = distance_smiles.zipWithIndex.find(j=>j._1._2==th.smiles).get
-                val mistakes = distance_smiles.splitAt(rank)._1.unzip._2.toArray
-                MyRD(th.smiles,rank,distance,mistakes,distance_smiles.unzip._1.toArray)
+            def dis(exp:MyExpIR,th:MyThIR):Double = {
+                new Gaussian(th.freqs.toSeq).loss(exp.vec.toSeq)
             }
-            val rd = thir_selected.map(thir2rd _)
+            val r = scala.util.Random
+            def dis_debug(exp:MyExpIR,th:MyThIR):Double = {
+                scala.math.abs(exp.smiles.length-th.smiles.length) + r.nextDouble * 3
+            }
+            def expir2rd(exp:MyExpIR):MyRD = {
+                val distance_smiles = thir_local.map(j=>(dis_debug(exp,j),j.smiles)).sorted
+                val ((distance,_),rank) = distance_smiles.zipWithIndex.find(j=>j._1._2==exp.smiles).get
+                val mistakes = distance_smiles.splitAt(rank)._1.unzip._2.toArray
+                MyRD(exp.smiles,rank,distance,mistakes,distance_smiles.unzip._1.toArray)
+            }
+            val rd = expir_included.repartition(count_expir).map(expir2rd _)
             rd.show()
             rd.write.parquet(resultpath+"/rd")
         }
