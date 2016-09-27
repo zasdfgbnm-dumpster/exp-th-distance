@@ -14,3 +14,9 @@ assemblyMergeStrategy in assembly := {
 	case PathList("irms", xs @ _*) => MergeStrategy.deduplicate
 	case x => MergeStrategy.discard
 }
+
+run in Compile := {
+	val jar = (assembly in assembly).value
+	val fullname = jar.getAbsolutePath()
+	s"spark-submit $fullname " !;
+}
