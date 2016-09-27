@@ -15,8 +15,14 @@ assemblyMergeStrategy in assembly := {
 	case x => MergeStrategy.discard
 }
 
+//paths
+//TODO: dedup path below
+val workspace = System.getProperty("user.home")+"/MEGA"
+val tables = workspace + "/tables"
+
 run in Compile := {
 	val jar = (assembly in assembly).value
 	val fullname = jar.getAbsolutePath()
+	s"rm -rf $tables/thexpvec $tables/distances" !;
 	s"spark-submit $fullname " !;
 }
