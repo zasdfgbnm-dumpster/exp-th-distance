@@ -1,11 +1,5 @@
 package irms {
 
-	object LineShapeHelpers {
-		// vectorization
-		// TODO: maybe it's better to set this as a class method of LineShape ?
-		def vec[R](f:Double=>R):Seq[R] = Params.X.xs.map(f)
-	}
-
 	abstract class LineShape(peaks:Seq[(Double,Double)]) {
 
 		// baseline: baseline of the spectrum
@@ -22,6 +16,8 @@ package irms {
 		// thir(x) = sum(j=0->m,f1(freq_j,intensity_j)(x)) + baseline(x)
 		def thir(x:Double):Double = getpeaks.map(j=>f1(j._1,j._2)(x)).sum + baseline(x)
 
+		def thir:Seq[Double] = Params.X.xs.map(thir _)
+
 		// loss function
 		def loss(expir:Seq[Double]):Double
 	}
@@ -37,10 +33,8 @@ package irms {
 		def dot(vec1:Seq[Double],vec2:Seq[Double]):Double = (vec1,vec2).zipped.map(_*_).sum
 
 		// cos(v1,v2) = v1.v2/sqrt(v1^2*v2^2)
-		def loss(expir:Seq[Double]):Double = {
-			val thvec = LineShapeHelpers.vec(thir)
-			dot(thvec,expir)/scala.math.sqrt(dot(thvec,thvec)*dot(expir,expir))
-		}
+		// loss = 1-cos(thir,expir)
+		def loss(expir:Seq[Double]):Double = 1-dot(thir,expir)/scala.math.sqrt(dot(thir,thir)*dot(expir,expir))
 	}
 
 	trait ZeroBaseline extends LineShape {
