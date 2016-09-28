@@ -1,6 +1,6 @@
 package irms {
 
-	abstract class LineShape(peaks:Seq[(Double,Double)]) {
+	abstract class LineShape(peaks:Seq[(Double,Double)]) extends Serializable {
 
 		// baseline: baseline of the spectrum
 		def baseline(x:Double):Double
