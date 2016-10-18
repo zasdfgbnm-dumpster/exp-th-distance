@@ -27,6 +27,16 @@ package irms {
 		override def getpeaks = super.getpeaks.map(j=>(scaling*j._1,j._2))
 	}
 
+	trait PiecewiseScaled extends LineShape {
+		import scala.collection.immutable.SortedMap
+		val scalings:SortedMap[Double,Double] //a list of (upper bound,scaling factor)
+		override def getpeaks = super.getpeaks.map(j=>{
+			val (freq,intensity) = j
+			val (_,scaling) = scalings.from(freq).head
+			(freq*scaling,intensity)
+		})
+	}
+
 	trait CosineLoss extends LineShape {
 
 		// dot product
