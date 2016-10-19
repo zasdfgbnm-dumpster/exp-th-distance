@@ -43,6 +43,6 @@ val tables = workspace + "/tables"
 run in Compile := {
 	val jar = (assembly in assembly).value
 	val fullname = jar.getAbsolutePath()
-	s"rm -rf $tables/thexpvec $tables/distances" !;
+	s"rm -rf $tables/thexpvec $tables/distances $tables/scalings" !;
 	s"spark-submit $fullname " !;
 }

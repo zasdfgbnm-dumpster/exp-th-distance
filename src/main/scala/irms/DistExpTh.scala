@@ -90,11 +90,15 @@ package irms {
 			val optimized_scalings = splited_thexp(0).as[MyThExp].map(j=>train_scalings1(j.freqs,j.vec))
 			println("optimized scalings:")
 			optimized_scalings.show()
-			val scaling_count = optimized_scalings.count()
-			def sum_scaling(a:Array[Double],b:Array[Double]):Array[Double] = {
-				(a.toSeq,b.toSeq).zipped.map(_+_).toArray
-			}
-			val avg_scalings = optimized_scalings.reduce(sum_scaling _).toSeq.map(_/scaling_count)
+			optimized_scalings.write.parquet(Env.tables+"/scalings")
+			def array_sum(a:Array[Double],b:Array[Double]):Array[Double] = (a,b).zipped.map(_+_)
+			val scaling_count = optimized_scalings.map(a=>a.map(j=>if(j != uniform_scaling) 1.0 else 0.0))
+			                                      .reduce(array_sum _)
+			val sum_scalings = optimized_scalings.map(a=>a.map(j=>if(j != uniform_scaling) j else 0.0))
+			                                     .reduce(array_sum _)
+			val avg_scalings = (sum_scalings,scaling_count).zipped.map((s,c)=>if(c==0) uniform_scaling else s/c)
+			println("average scalings:")
+			println(avg_scalings)
 			val scaling_map = SortedMap(uppers.zip(avg_scalings).toArray:_*)
 
 			// output vectorized thir
