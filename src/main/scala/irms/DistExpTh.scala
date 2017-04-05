@@ -18,12 +18,13 @@ package irms {
 			import org.apache.spark.sql._
 			import org.apache.spark._
 			import org.apache.spark.sql.functions._
-			import Env.spark.implicits._
+			val spark = Env.spark
+			import spark.implicits._
 
 			// pick data
-			val mid_structure = TableManager.getOrCreate(MIDStruct)
-			val expir = TableManager.getOrCreate(ExpIRAndState).filter(_.state=="gas")
-			val thir = TableManager.getOrCreate(TheoreticalIR).filter(_.method=="B3LYP/6-31G*")
+			val mid_structure = TableManager.getOrCreate(MIDStruct).as[MIDStruct]
+			val expir = TableManager.getOrCreate(ExpIRAndState).as[ExpIRAndState].filter(_.state=="gas")
+			val thir = TableManager.getOrCreate(TheoreticalIR).as[TheoreticalIR].filter(_.method=="B3LYP/6-31G*")
 			val thexp = expir.join(mid_structure,"mid").join(thir,"smiles")
 
 			// output vectorized thir
@@ -41,7 +42,7 @@ package irms {
 			}
 			val myexp = thexp.select("smiles","vec").dropDuplicates("smiles").as[MyExp]
 			val count = thir_local.length
-			val rd = myexp.repartition(count/20).map(expir2rd _)
+			val rd = myexp.repartition(count).map(expir2rd _)
 			rd.show()
 			println("total number of data: "+count)
 			rd.write.parquet(Env.tables+"/distances")
